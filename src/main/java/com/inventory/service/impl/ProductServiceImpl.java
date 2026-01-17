@@ -11,6 +11,7 @@ import com.inventory.mapper.ProductMapper;
 import com.inventory.service.IProductService;
 import com.inventory.util.CsvReaderUtil;
 import com.inventory.util.ExcelReaderUtil;
+import jakarta.annotation.PostConstruct;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -21,6 +22,13 @@ public class ProductServiceImpl implements IProductService {
 
     private final List<ProductDTO> productStore = new ArrayList<>();
     private final Set<String> uniqueKeys = new HashSet<>();
+
+    @PostConstruct
+    public void clearOnStartup() {
+        productStore.clear();
+        uniqueKeys.clear();
+        System.out.println("Product store cleared on application startup");
+    }
 
     @Override
     public ExcelUploadResultDTO uploadExcel(MultipartFile file) {
