@@ -74,6 +74,7 @@ public class ProductServiceImpl implements IProductService {
                     .totalPages(0)
                     .last(true)
                     .build();
+
         }
 
         Comparator<ProductDTO> comparator = getComparator(sortBy);
@@ -120,6 +121,7 @@ public class ProductServiceImpl implements IProductService {
             case "stockAge" -> Comparator.comparing(ProductDTO::getStockAge);
             case "inventoryValue" -> Comparator.comparing(ProductDTO::getInventoryValue);
             default -> throw new IllegalArgumentException("Invalid sort field: " + sortBy);
+
         };
     }
 
@@ -141,6 +143,7 @@ public class ProductServiceImpl implements IProductService {
                 .totalInventoryValue(totalValue)
                 .averageStockAge(avgAge)
                 .build();
+
     }
 }
 
