@@ -1,9 +1,14 @@
 version: "3.8"
 
 services:
-  inventory-backend:
-    build: .
-    container_name: inventory-backend
+  backend:
+    build: ./Inventory-Backend
     ports:
       - "8080:8080"
-    restart: always
+
+  frontend:
+    build: ./Inventory-Frontend
+    ports:
+      - "4200:80"
+    depends_on:
+      - backend

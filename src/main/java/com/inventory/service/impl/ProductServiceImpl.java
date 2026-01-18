@@ -4,10 +4,12 @@ import com.inventory.dto.ExcelUploadResultDTO;
 import com.inventory.dto.PageResponseDTO;
 import com.inventory.dto.ProductDTO;
 import com.inventory.dto.ProductSummaryDTO;
+import com.inventory.entity.Inventory;
 import com.inventory.exception.DuplicateProductException;
 import com.inventory.exception.IllegalArgumentException;
 import com.inventory.exception.InvalidExcelException;
 import com.inventory.mapper.ProductMapper;
+import com.inventory.repository.InventoryRepository;
 import com.inventory.service.IProductService;
 import com.inventory.util.CsvReaderUtil;
 import com.inventory.util.ExcelReaderUtil;
@@ -21,15 +23,16 @@ import java.util.*;
 public class ProductServiceImpl implements IProductService {
 
     private final List<ProductDTO> productStore = new ArrayList<>();
-    private final Set<String> uniqueKeys = new HashSet<>();
+    private final InventoryRepository inventoryRepository;
+
+    public ProductServiceImpl(InventoryRepository inventoryRepository) {
+        this.inventoryRepository = inventoryRepository;
+    }
 
     @PostConstruct
     public void clearOnStartup() {
         productStore.clear();
-        uniqueKeys.clear();
-        System.out.println("Product store cleared on application startup");
     }
-
 
     @Override
     public ExcelUploadResultDTO uploadExcel(MultipartFile file) {
@@ -51,27 +54,35 @@ public class ProductServiceImpl implements IProductService {
         }
 
         for (ProductDTO dto : validProducts) {
-            String key = dto.getProductSku() + "_" + dto.getPurchaseDate();
 
-            if (!uniqueKeys.add(key)) {
+            String sku = dto.getProductSku();
+            var date = dto.getPurchaseDate();
+
+            if (inventoryRepository.existsByProductSkuAndPurchaseDate(sku, date)) {
                 throw new DuplicateProductException(
-                        "Duplicate Product SKU + Purchase Date found: " + key
+                        "Duplicate Product SKU + Purchase Date: " + sku + " - " + date
                 );
             }
 
+            Inventory inventory = Inventory.builder()
+                    .productSku(dto.getProductSku())
+                    .productName(dto.getProductName())
+                    .category(dto.getCategory())
+                    .purchaseDate(dto.getPurchaseDate())
+                    .unitPrice(dto.getUnitPrice())
+                    .quantity(dto.getQuantity())
+                    .build();
+
+            inventoryRepository.save(inventory);
             productStore.add(ProductMapper.enrich(dto));
         }
 
         return result;
     }
 
-
     @Override
     public PageResponseDTO<ProductDTO> getProducts(
-            int page,
-            int size,
-            String sortBy,
-            String direction
+            int page, int size, String sortBy, String direction
     ) throws IllegalArgumentException {
 
         if (productStore.isEmpty()) {
@@ -83,14 +94,10 @@ public class ProductServiceImpl implements IProductService {
                     .totalPages(0)
                     .last(true)
                     .build();
-
         }
 
         Comparator<ProductDTO> comparator = getComparator(sortBy);
-
-        if ("desc".equalsIgnoreCase(direction)) {
-            comparator = comparator.reversed();
-        }
+        if ("desc".equalsIgnoreCase(direction)) comparator = comparator.reversed();
 
         List<ProductDTO> sortedList = productStore.stream()
                 .sorted(comparator)
@@ -116,12 +123,7 @@ public class ProductServiceImpl implements IProductService {
                 .build();
     }
 
-    private Comparator<ProductDTO> getComparator(String sortBy) throws IllegalArgumentException {
-
-        if (sortBy == null) {
-            return Comparator.comparing(ProductDTO::getProductName);
-        }
-
+    private Comparator<ProductDTO> getComparator(String sortBy) {
         return switch (sortBy) {
             case "productName" -> Comparator.comparing(ProductDTO::getProductName);
             case "purchaseDate" -> Comparator.comparing(ProductDTO::getPurchaseDate);
@@ -129,12 +131,9 @@ public class ProductServiceImpl implements IProductService {
             case "quantity" -> Comparator.comparing(ProductDTO::getQuantity);
             case "stockAge" -> Comparator.comparing(ProductDTO::getStockAge);
             case "inventoryValue" -> Comparator.comparing(ProductDTO::getInventoryValue);
-            default -> throw new IllegalArgumentException("Invalid sort field: " + sortBy);
-
+            default -> Comparator.comparing(ProductDTO::getProductName);
         };
     }
-
-
 
     @Override
     public ProductSummaryDTO getSummary() {
@@ -152,8 +151,5 @@ public class ProductServiceImpl implements IProductService {
                 .totalInventoryValue(totalValue)
                 .averageStockAge(avgAge)
                 .build();
-
     }
 }
-
-
