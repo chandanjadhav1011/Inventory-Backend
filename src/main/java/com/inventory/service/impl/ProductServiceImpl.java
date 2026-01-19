@@ -13,34 +13,23 @@ import com.inventory.repository.InventoryRepository;
 import com.inventory.service.IProductService;
 import com.inventory.util.CsvReaderUtil;
 import com.inventory.util.ExcelReaderUtil;
-import jakarta.annotation.PostConstruct;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.*;
 
 @Service
+@RequiredArgsConstructor
 public class ProductServiceImpl implements IProductService {
 
-    private boolean clearedAfterUpload = false;
-
-    private final List<ProductDTO> productStore = new ArrayList<>();
     private final InventoryRepository inventoryRepository;
 
-    public ProductServiceImpl(InventoryRepository inventoryRepository) {
-        this.inventoryRepository = inventoryRepository;
-    }
-
-    @PostConstruct
-    public void clearOnStartup() {
-        productStore.clear();
-    }
 
     @Override
     public ExcelUploadResultDTO uploadFile(MultipartFile file) {
 
         inventoryRepository.deleteAll();
-        productStore.clear();
 
         List<ProductDTO> validProducts = new ArrayList<>();
 
@@ -60,12 +49,12 @@ public class ProductServiceImpl implements IProductService {
 
         for (ProductDTO dto : validProducts) {
 
-            String sku = dto.getProductSku();
-            var date = dto.getPurchaseDate();
+            if (inventoryRepository.existsByProductSkuAndPurchaseDate(
+                    dto.getProductSku(), dto.getPurchaseDate())) {
 
-            if (inventoryRepository.existsByProductSkuAndPurchaseDate(sku, date)) {
                 throw new DuplicateProductException(
-                        "Duplicate Product SKU + Purchase Date: " + sku + " - " + date
+                        "Duplicate Product SKU + Purchase Date: "
+                                + dto.getProductSku() + " - " + dto.getPurchaseDate()
                 );
             }
 
@@ -79,7 +68,6 @@ public class ProductServiceImpl implements IProductService {
                     .build();
 
             inventoryRepository.save(inventory);
-            productStore.add(ProductMapper.enrich(dto));
         }
 
         return result;
@@ -87,10 +75,11 @@ public class ProductServiceImpl implements IProductService {
 
     @Override
     public PageResponseDTO<ProductDTO> getProducts(
-            int page, int size, String sortBy, String direction
-    ) throws IllegalArgumentException {
+            int page, int size, String sortBy, String direction) throws IllegalArgumentException {
 
-        if (productStore.isEmpty()) {
+        List<Inventory> inventories = inventoryRepository.findAll();
+
+        if (inventories.isEmpty()) {
             return PageResponseDTO.<ProductDTO>builder()
                     .content(List.of())
                     .page(page)
@@ -101,14 +90,20 @@ public class ProductServiceImpl implements IProductService {
                     .build();
         }
 
-        Comparator<ProductDTO> comparator = getComparator(sortBy);
-        if ("desc".equalsIgnoreCase(direction)) comparator = comparator.reversed();
+        List<ProductDTO> products = inventories.stream()
+                .map(ProductMapper::enrich)
+                .toList();
 
-        List<ProductDTO> sortedList = productStore.stream()
+        Comparator<ProductDTO> comparator = getComparator(sortBy);
+        if ("desc".equalsIgnoreCase(direction)) {
+            comparator = comparator.reversed();
+        }
+
+        List<ProductDTO> sorted = products.stream()
                 .sorted(comparator)
                 .toList();
 
-        int totalElements = sortedList.size();
+        int totalElements = sorted.size();
         int start = page * size;
 
         if (start >= totalElements) {
@@ -119,7 +114,7 @@ public class ProductServiceImpl implements IProductService {
         int totalPages = (int) Math.ceil((double) totalElements / size);
 
         return PageResponseDTO.<ProductDTO>builder()
-                .content(sortedList.subList(start, end))
+                .content(sorted.subList(start, end))
                 .page(page)
                 .size(size)
                 .totalElements(totalElements)
@@ -142,21 +137,25 @@ public class ProductServiceImpl implements IProductService {
 
     @Override
     public ProductSummaryDTO getSummary() {
-        double totalValue = productStore.stream()
-                .mapToDouble(ProductDTO::getInventoryValue)
+
+        List<Inventory> inventories = inventoryRepository.findAll();
+
+        double totalValue = inventories.stream()
+                .mapToDouble(i -> i.getUnitPrice() * i.getQuantity())
                 .sum();
 
-        double avgAge = productStore.stream()
-                .mapToLong(ProductDTO::getStockAge)
+        double avgAge = inventories.stream()
+                .mapToLong(i -> ProductMapper.calculateStockAge(i.getPurchaseDate()))
                 .average()
                 .orElse(0);
 
         avgAge = Math.round(avgAge * 100.0) / 100.0;
 
         return ProductSummaryDTO.builder()
-                .totalProducts(productStore.size())
+                .totalProducts(inventories.size())
                 .totalInventoryValue(totalValue)
                 .averageStockAge(avgAge)
                 .build();
     }
 }
+
