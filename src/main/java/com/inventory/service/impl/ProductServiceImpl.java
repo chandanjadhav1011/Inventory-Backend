@@ -146,6 +146,8 @@ public class ProductServiceImpl implements IProductService {
                 .average()
                 .orElse(0);
 
+        avgAge = Math.round(avgAge * 100.0) / 100.0;
+
         return ProductSummaryDTO.builder()
                 .totalProducts(productStore.size())
                 .totalInventoryValue(totalValue)
