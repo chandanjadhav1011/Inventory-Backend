@@ -26,7 +26,7 @@ public class ProductController {
     public ResponseEntity<ApiResponse<ExcelUploadResultDTO>> uploadExcel(
             @RequestPart("file") MultipartFile file
     ) {
-        ExcelUploadResultDTO result = productService.uploadExcel(file);
+        ExcelUploadResultDTO result = productService.uploadFile(file);
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)

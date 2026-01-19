@@ -22,6 +22,8 @@ import java.util.*;
 @Service
 public class ProductServiceImpl implements IProductService {
 
+    private boolean clearedAfterUpload = false;
+
     private final List<ProductDTO> productStore = new ArrayList<>();
     private final InventoryRepository inventoryRepository;
 
@@ -35,7 +37,10 @@ public class ProductServiceImpl implements IProductService {
     }
 
     @Override
-    public ExcelUploadResultDTO uploadExcel(MultipartFile file) {
+    public ExcelUploadResultDTO uploadFile(MultipartFile file) {
+
+        inventoryRepository.deleteAll();
+        productStore.clear();
 
         List<ProductDTO> validProducts = new ArrayList<>();
 

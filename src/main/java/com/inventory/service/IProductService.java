@@ -9,7 +9,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 public interface IProductService {
 
-    public ExcelUploadResultDTO uploadExcel(MultipartFile file);
+    public ExcelUploadResultDTO uploadFile(MultipartFile file);
 
     public PageResponseDTO<ProductDTO> getProducts(int page, int size, String sortBy, String direction) throws IllegalArgumentException;
     public ProductSummaryDTO getSummary();
