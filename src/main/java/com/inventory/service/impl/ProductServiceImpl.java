@@ -13,6 +13,7 @@ import com.inventory.repository.InventoryRepository;
 import com.inventory.service.IProductService;
 import com.inventory.util.CsvReaderUtil;
 import com.inventory.util.ExcelReaderUtil;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -156,6 +157,13 @@ public class ProductServiceImpl implements IProductService {
                 .totalInventoryValue(totalValue)
                 .averageStockAge(avgAge)
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public void clearInventoryDb() {
+        inventoryRepository.truncateInventory();
+        inventoryRepository.resetInventoryIdentity();
     }
 }
 

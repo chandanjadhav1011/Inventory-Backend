@@ -13,6 +13,7 @@ public interface IProductService {
 
     public PageResponseDTO<ProductDTO> getProducts(int page, int size, String sortBy, String direction) throws IllegalArgumentException;
     public ProductSummaryDTO getSummary();
+    public void clearInventoryDb();
 
 
 }

@@ -72,4 +72,17 @@ public class ProductController {
                         .build()
         );
     }
+
+    @DeleteMapping("/clear")
+    public ResponseEntity<ApiResponse<Void>> clearInventoryDb() {
+        productService.clearInventoryDb();
+        return ResponseEntity.ok(
+                ApiResponse.<Void>builder()
+                        .success(true)
+                        .message("Inventory database cleared successfully")
+                        .data(null)
+                        .timestamp(LocalDateTime.now())
+                        .build()
+        );
+    }
 }

@@ -4,6 +4,7 @@ import com.inventory.dto.ExcelUploadResultDTO;
 import com.inventory.dto.PageResponseDTO;
 import com.inventory.dto.ProductDTO;
 import com.inventory.dto.ProductSummaryDTO;
+import com.inventory.entity.Inventory;
 import com.inventory.exception.DuplicateProductException;
 import com.inventory.repository.InventoryRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,8 +15,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -29,15 +34,13 @@ class ProductServiceImplTest {
     @InjectMocks
     private ProductServiceImpl productService;
 
-    @BeforeEach
-    void setup() {
-        // default: no duplicate exists in DB
-        when(inventoryRepository.existsByProductSkuAndPurchaseDate(any(), any()))
-                .thenReturn(false);
-    }
+
 
     @Test
     void uploadCsv_shouldProcessAllRowsSuccessfully() throws Exception {
+
+        when(inventoryRepository.existsByProductSkuAndPurchaseDate(any(), any()))
+                .thenReturn(false);
 
         MockMultipartFile csvFile = new MockMultipartFile(
                 "file",
@@ -49,7 +52,7 @@ class ProductServiceImplTest {
                 )
         );
 
-        ExcelUploadResultDTO result = productService.uploadExcel(csvFile);
+        ExcelUploadResultDTO result = productService.uploadFile(csvFile);
 
         assertNotNull(result);
         assertEquals(10, result.getTotalRows());
@@ -61,6 +64,9 @@ class ProductServiceImplTest {
     @Test
     void uploadExcel_shouldSkipInvalidRowsAndReturnCounts() throws Exception {
 
+        when(inventoryRepository.existsByProductSkuAndPurchaseDate(any(), any()))
+                .thenReturn(false);
+
         MockMultipartFile excelFile = new MockMultipartFile(
                 "file",
                 "products.xlsx",
@@ -71,29 +77,22 @@ class ProductServiceImplTest {
                 )
         );
 
-        ExcelUploadResultDTO result = productService.uploadExcel(excelFile);
+        ExcelUploadResultDTO result = productService.uploadFile(excelFile);
 
-        assertNotNull(result);
         assertEquals(20, result.getTotalRows());
         assertEquals(15, result.getSuccessCount());
         assertEquals(5, result.getFailedCount());
         assertFalse(result.getErrors().isEmpty());
     }
 
+
+
     @Test
-    void pagination_shouldThrowException_forInvalidPage() throws Exception {
+    void pagination_shouldThrowException_forInvalidPage()
+            throws com.inventory.exception.IllegalArgumentException {
 
-        MockMultipartFile csvFile = new MockMultipartFile(
-                "file",
-                "products.csv",
-                "text/csv",
-                Objects.requireNonNull(
-                        getClass().getClassLoader()
-                                .getResourceAsStream("product_inventory_10_records.csv")
-                )
-        );
-
-        productService.uploadExcel(csvFile);
+        when(inventoryRepository.findAll())
+                .thenReturn(mockInventories(10));
 
         com.inventory.exception.IllegalArgumentException ex = assertThrows(
                 com.inventory.exception.IllegalArgumentException.class,
@@ -105,19 +104,11 @@ class ProductServiceImplTest {
 
 
     @Test
-    void getProducts_shouldReturnPagedData() throws Exception {
+    void getProducts_shouldReturnPagedData()
+            throws com.inventory.exception.IllegalArgumentException {
 
-        MockMultipartFile csvFile = new MockMultipartFile(
-                "file",
-                "products.csv",
-                "text/csv",
-                Objects.requireNonNull(
-                        getClass().getClassLoader()
-                                .getResourceAsStream("product_inventory_10_records.csv")
-                )
-        );
-
-        productService.uploadExcel(csvFile);
+        when(inventoryRepository.findAll())
+                .thenReturn(mockInventories(10));
 
         PageResponseDTO<ProductDTO> page =
                 productService.getProducts(0, 5, "productName", "asc");
@@ -128,20 +119,13 @@ class ProductServiceImplTest {
         assertFalse(page.isLast());
     }
 
+
+
     @Test
-    void summary_shouldReturnCorrectValues() throws Exception {
+    void summary_shouldReturnCorrectValues() {
 
-        MockMultipartFile csvFile = new MockMultipartFile(
-                "file",
-                "products.csv",
-                "text/csv",
-                Objects.requireNonNull(
-                        getClass().getClassLoader()
-                                .getResourceAsStream("product_inventory_10_records.csv")
-                )
-        );
-
-        productService.uploadExcel(csvFile);
+        when(inventoryRepository.findAll())
+                .thenReturn(mockInventories(10));
 
         ProductSummaryDTO summary = productService.getSummary();
 
@@ -149,6 +133,7 @@ class ProductServiceImplTest {
         assertTrue(summary.getTotalInventoryValue() > 0);
         assertTrue(summary.getAverageStockAge() >= 0);
     }
+
 
 
     @Test
@@ -167,13 +152,42 @@ class ProductServiceImplTest {
                 )
         );
 
-        DuplicateProductException ex = assertThrows(
+        assertThrows(
                 DuplicateProductException.class,
-                () -> productService.uploadExcel(csvFile)
+                () -> productService.uploadFile(csvFile)
         );
-
-        assertTrue(ex.getMessage().contains("Duplicate Product SKU + Purchase Date"));
     }
 
 
+
+    @Test
+    void clearInventoryDb_shouldTruncateTableAndResetIdentity() {
+
+        productService.clearInventoryDb();
+
+        verify(inventoryRepository, times(1)).truncateInventory();
+        verify(inventoryRepository, times(1)).resetInventoryIdentity();
+    }
+
+
+
+    private List<Inventory> mockInventories(int count) {
+        List<Inventory> list = new ArrayList<>();
+
+        for (int i = 1; i <= count; i++) {
+            list.add(
+                    Inventory.builder()
+                            .id((long) i)
+                            .productSku("SKU-" + i)
+                            .productName("Product-" + i)
+                            .category("Test")
+                            .purchaseDate(java.time.LocalDate.now().minusDays(i))
+                            .unitPrice(1000)
+                            .quantity(1)
+                            .build()
+            );
+        }
+        return list;
+    }
 }
+

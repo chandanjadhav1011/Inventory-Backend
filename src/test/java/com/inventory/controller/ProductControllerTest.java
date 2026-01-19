@@ -42,7 +42,7 @@ class ProductControllerTest {
                 .failedCount(0)
                 .build();
 
-        Mockito.when(productService.uploadExcel(any()))
+        Mockito.when(productService.uploadFile(any()))
                 .thenReturn(result);
 
         MockMultipartFile file = new MockMultipartFile(
@@ -116,5 +116,31 @@ class ProductControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.totalProducts").value(5))
                 .andExpect(jsonPath("$.data.totalInventoryValue").value(250000));
+    }
+
+
+    @Test
+    void clearInventoryDb_shouldReturnSuccess() throws Exception {
+
+        Mockito.doNothing().when(productService).clearInventoryDb();
+
+        mockMvc.perform(delete("/api/products/clear"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message")
+                        .value("Inventory database cleared successfully"))
+                .andExpect(jsonPath("$.data").doesNotExist());
+    }
+
+
+    @Test
+    void clearInventoryDb_shouldInvokeService() throws Exception {
+
+        Mockito.doNothing().when(productService).clearInventoryDb();
+
+        mockMvc.perform(delete("/api/products/clear"))
+                .andExpect(status().isOk());
+
+        Mockito.verify(productService, Mockito.times(1)).clearInventoryDb();
     }
 }
