@@ -4,7 +4,9 @@ services:
   backend:
     build: ./Inventory-Backend
     ports:
-      - "8080:8080"
+      - "8443:8443"
+    volumes:
+      - /opt/ssl:/opt/ssl:ro
 
   frontend:
     build: ./Inventory-Frontend
